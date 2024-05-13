@@ -55,6 +55,7 @@ class EinstellungenImportExport(QDialog):
             tempCheckbox = QCheckBox(text)
             tempCheckbox.setStyleSheet("font-weight:normal")
             tempCheckbox.setChecked(True)
+            tempCheckbox.setEnabled(False)
             tempCheckbox.clicked.connect(self.checkboxClicked) # type: ignore
             self.checkboxEinstellungen.append(tempCheckbox)
         groupboxEinstellungenLayout = QVBoxLayout()
