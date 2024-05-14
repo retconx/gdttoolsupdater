@@ -357,7 +357,6 @@ class MainWindow(QMainWindow):
         """
         iv = self.labelInstallierteVersionen[gdtToolNr].text()
         lv = self.labelAktuelleVersionen[gdtToolNr].text()
-        print(iv)
         return iv != "-" and lv != "?" and versionVeraltet(iv[1:], lv[1:]) # ohne V)
 
     def pushButtonProgrammverzeichnisClicked(self, checked, gdtToolNr):
@@ -382,6 +381,7 @@ class MainWindow(QMainWindow):
                         with open(os.path.join(self.configPath, "config.ini"), "w", encoding="utf-8") as configfile:
                             self.configIni.write(configfile)
                             logger.logger.info("Programmverzeichnis " + fd.directory().absolutePath() + " für " + gdtTools[gdtTool] + " gespeichert")
+                            self.status.showMessage("Programmverzeichnis für " + gdtTools[gdtTool] + " gespeichert")
                     except Exception as e:
                         mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Fehler beim Speichern des Programmverzeichnisses " + fd.directory().absolutePath(), QMessageBox.StandardButton.Ok)
                         mb.exec()
