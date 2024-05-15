@@ -6,6 +6,7 @@ basedir = os.path.dirname(__file__)
 class WorkerSignals(QObject):
     statusmeldung = Signal(str)
     updateErfolgreich = Signal(int, bool)
+    progressProzent = Signal(int)
 
 class UpdateWorker(QRunnable):
 
@@ -37,8 +38,15 @@ class UpdateWorker(QRunnable):
             url = "https://github.com/retconx/" + gdtTool + "/releases/download/v" + self.latestVersion + "/" + zipname
             response = requests.get(url)
             # Zip-Datei im Download-Ordner speichern
+            gesamtLaenge = int(str(response.headers.get('content-length')))
+            geladeneLaenge = 0
             zip = open(os.path.join(downloadverzeichnis, zipname), "wb")
-            zip.write(response.content)
+            for data in response.iter_content(chunk_size=65536):
+                geladeneLaenge += len(data)
+                geladeneLaengeProzent = int(geladeneLaenge / gesamtLaenge * 100)
+                self.signals.statusmeldung.emit(str(zipname) + " von GitHub herunterladen...")
+                self.signals.progressProzent.emit(geladeneLaengeProzent)
+                zip.write(response.content)
             zip.close()
             try:
                 # Zip-Datei in Downloads/... entpacken
@@ -62,6 +70,7 @@ class UpdateWorker(QRunnable):
                         shutil.rmtree(os.path.join(downloadverzeichnis, self.gdtTools[gdtTool]))
                         self.signals.statusmeldung.emit("Update erfolgreich beendet")
                         self.signals.updateErfolgreich.emit(self.gdtToolNr, True)
+                        self.signals.progressProzent.emit(0)
                     except Exception as e:
                         self.signals.statusmeldung.emit("Problem beim Bereinigen des Downloadverzeichnisses")
                         self.signals.updateErfolgreich.emit(self.gdtToolNr, False)
