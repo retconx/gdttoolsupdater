@@ -258,7 +258,6 @@ class MainWindow(QMainWindow):
             lv = "?"
             try:
                 response = requests.get("https://api.github.com/repos/retconx/" + str(gdtTool) + "/releases/latest", headers={"Authorization" : "Bearer " + gth})
-                print(response.headers)
                 githubRelaseTag = response.json()["tag_name"]
                 lv = githubRelaseTag[1:] # ohne v
             except Exception as e:
