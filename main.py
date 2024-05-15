@@ -195,13 +195,13 @@ class MainWindow(QMainWindow):
         self.fontBold = QFont()
         self.fontBold.setBold(True)
 
-        # # Updateprüfung auf Github
-        # try:
-        #     self.updatePruefung(meldungNurWennUpdateVerfuegbar=True)
-        # except Exception as e:
-        #     mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Updateprüfung nicht möglich.\nBitte überprüfen Sie Ihre Internetverbindung." + str(e), QMessageBox.StandardButton.Ok)
-        #     mb.exec()
-        #     logger.logger.warning("Updateprüfung nicht möglich: " + str(e))
+        # Updateprüfung auf Github
+        try:
+            self.updatePruefung(meldungNurWennUpdateVerfuegbar=True)
+        except Exception as e:
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Updateprüfung nicht möglich.\nBitte überprüfen Sie Ihre Internetverbindung." + str(e), QMessageBox.StandardButton.Ok)
+            mb.exec()
+            logger.logger.warning("Updateprüfung nicht möglich: " + str(e))
 
         # Foromularaufbau
         self.widget = QWidget()
