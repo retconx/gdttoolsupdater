@@ -228,6 +228,7 @@ class MainWindow(QMainWindow):
             githubRelaseTag = response.json()["tag_name"]
             global _verfuegbareVersion
             _verfuegbareVersion = githubRelaseTag[1:] # ohne v
+            logger.logger.info("Verfügbare Version: " + _verfuegbareVersion)
         except Exception as e:
             logger.logger.error("Fehler beim GitHub-Abruf der aktuellen Version von " + _gdtToolGross + ": " + str(e))
             mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Problem beim GitHub-Abruf der verfügbaren Version: " + str(e), QMessageBox.StandardButton.Ok)
