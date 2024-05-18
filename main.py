@@ -1,6 +1,6 @@
 import sys, configparser, os, datetime, shutil, logger
-import requests, atexit, subprocess
-import logger, dialogEula, dialogEula, dialogUeberGdtToolsUpdater, dialogEinstellungenImportExport, class_updateWorker
+import requests, atexit, subprocess, re
+import logger, dialogEula, dialogEula, dialogUeberGdtToolsUpdater, class_updateWorker
 ## Nur mit Lizenz
 import kd
 ## /Nur mit Lizenz
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QVBoxLayout,
+    QHBoxLayout,
     QFileDialog,
     QStatusBar,
     QProgressBar,
@@ -32,6 +33,7 @@ gth = ""
 ## #Nur mit Lizenz
 gth = kd.dekrypt("10675B00705320474A60682AE0555F60334360344520375940364C20706040572D80783AA0743B80373AA0762F40474D00436AC03448A04341A0712BCE")
 ## /Nur mit Lizenz
+
 gdtTools = {
     "dosisgdt": "DosisGDT",
     "gerigdt": "GeriGDT",
@@ -40,6 +42,17 @@ gdtTools = {
     "scoregdt": "ScoreGDT",
     "signogdt": "SignoGDT"
     }
+
+if len(sys.argv) != 4:
+    logger.logger.error("Argumentübergabe fehlerhaft: " + str.join(",", sys.argv))
+_gdtToolKlein = str(sys.argv[1])
+logger.logger.info("GDT-Tool: " + _gdtToolKlein)
+_gdtToolGross = gdtTools[_gdtToolKlein]
+_installierteVersion = str(sys.argv[2])
+logger.logger.info("Installierte Version: " + _installierteVersion)
+_programmverzeichnis = str(sys.argv[3])
+logger.logger.info("Programmverzeichnis: " + _programmverzeichnis)
+_verfuegbareVersion = "?"
 
 def versionVeraltet(versionAktuell:str, versionVergleich:str):
     """
@@ -50,21 +63,26 @@ def versionVeraltet(versionAktuell:str, versionVergleich:str):
     Rückgabe:
         True, wenn versionAktuell veraltet
     """
-    versionVeraltet= False
-    hunderterBase = int(versionVergleich.split(".")[0])
-    zehnerBase = int(versionVergleich.split(".")[1])
-    einserBase = int(versionVergleich.split(".")[2])
-    hunderter = int(versionAktuell.split(".")[0])
-    zehner = int(versionAktuell.split(".")[1])
-    einser = int(versionAktuell.split(".")[2])
-    if hunderterBase > hunderter:
-        versionVeraltet = True
-    elif hunderterBase == hunderter:
-        if zehnerBase >zehner:
+    patternVersion = r"^\d+\.\d+\.\d+$"
+    versionVeraltet = False
+    if re.match(patternVersion, versionAktuell) != None and re.match(patternVersion, versionVergleich) != None:
+        hunderterBase = int(versionVergleich.split(".")[0])
+        zehnerBase = int(versionVergleich.split(".")[1])
+        einserBase = int(versionVergleich.split(".")[2])
+        hunderter = int(versionAktuell.split(".")[0])
+        zehner = int(versionAktuell.split(".")[1])
+        einser = int(versionAktuell.split(".")[2])
+        if hunderterBase > hunderter:
             versionVeraltet = True
-        elif zehnerBase == zehner:
-            if einserBase > einser:
+        elif hunderterBase == hunderter:
+            if zehnerBase >zehner:
                 versionVeraltet = True
+            elif zehnerBase == zehner:
+                if einserBase > einser:
+                    versionVeraltet = True
+    else:
+        logger.logger.error("Falsches Format für den Versionsvergleich: " + versionAktuell + ", " + versionVergleich)
+        raise GdtToolsUpdaterException("Falsches Format für den Versionsvergleich")
     return versionVeraltet
 
 # Sicherstellen, dass Icon in Windows angezeigt wird
@@ -118,12 +136,12 @@ class MainWindow(QMainWindow):
                 self.configPath = updateSafePath
             except:
                 logger.logger.error("Problem beim Kopieren der config.ini von " + basedir + " nach " + updateSafePath)
-                mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Problem beim Kopieren der Konfigurationsdatei. GDT-Tools Updater wird mit Standardeinstellungen gestartet.", QMessageBox.StandardButton.Ok)
+                mb = QMessageBox(QMessageBox.Icon.Warning, "HHinweis von " + _gdtToolGross + "-Updater", "Problem beim Kopieren der Konfigurationsdatei. GDT-Tools Updater wird mit Standardeinstellungen gestartet.", QMessageBox.StandardButton.Ok)
                 mb.exec()
                 self.configPath = basedir
         else:
             logger.logger.critical("config.ini fehlt")
-            mb = QMessageBox(QMessageBox.Icon.Critical, "Hinweis von GDT-Tools Updater", "Die Konfigurationsdatei config.ini fehlt. GDT-Tools Updater kann nicht gestartet werden.", QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Critical, "Hinweis von " + _gdtToolGross + "-Updater", "Die Konfigurationsdatei config.ini fehlt. GDT-Tools Updater kann nicht gestartet werden.", QMessageBox.StandardButton.Ok)
             mb.exec()
             sys.exit()
         self.configIni.read(os.path.join(self.configPath, "config.ini"), encoding="utf-8")
@@ -144,7 +162,7 @@ class MainWindow(QMainWindow):
                     self.configIni.write(configfile)
                 logger.logger.info("EULA zugestimmt")
             else:
-                mb = QMessageBox(QMessageBox.Icon.Information, "Hinweis von GDT-Tools Updater", "Ohne Zustimmung der Lizenzvereinbarung kann GDT-Tools Updater nicht gestartet werden.", QMessageBox.StandardButton.Ok)
+                mb = QMessageBox(QMessageBox.Icon.Information, "Hinweis von " + _gdtToolGross + "-Updater", "Ohne Zustimmung der Lizenzvereinbarung kann GDT-Tools Updater nicht gestartet werden.", QMessageBox.StandardButton.Ok)
                 mb.exec()
                 sys.exit()
 
@@ -175,21 +193,22 @@ class MainWindow(QMainWindow):
                     logger.logger.info("EULA zugestimmt")
                 else:
                     logger.logger.info("EULA nicht zugestimmt")
-                    mb = QMessageBox(QMessageBox.Icon.Information, "Hinweis von GDT-Tools Updater", "Ohne  Zustimmung zur Lizenzvereinbarung kann GDT-Tools Updater nicht gestartet werden.", QMessageBox.StandardButton.Ok)
+                    mb = QMessageBox(QMessageBox.Icon.Information, "Hinweis von " + _gdtToolGross + "-Updater", "Ohne  Zustimmung zur Lizenzvereinbarung kann GDT-Tools Updater nicht gestartet werden.", QMessageBox.StandardButton.Ok)
                     mb.exec()
                     sys.exit()
         except SystemExit:
             sys.exit()
         except:
             logger.logger.error("Problem beim Aktualisieren auf Version " + configIniBase["Allgemein"]["version"])
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Problem beim Aktualisieren auf Version " + configIniBase["Allgemein"]["version"], QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Problem beim Aktualisieren auf Version " + configIniBase["Allgemein"]["version"], QMessageBox.StandardButton.Ok)
             mb.exec()
         
         jahr = datetime.datetime.now().year
         copyrightJahre = "2024"
         if jahr > 2024:
             copyrightJahre = "2024-" + str(jahr)
-        self.setWindowTitle("GDT-Tools Updater V" + self.version + " (\u00a9 Fabian Treusch - GDT-Tools " + copyrightJahre + ")")
+        self.setWindowTitle(_gdtToolGross + "-Updater V" + self.version + " (\u00a9 Fabian Treusch - GDT-Tools " + copyrightJahre + ")")
+        self.setFixedWidth(600)
         self.fontNormal = QFont()
         self.fontNormal.setBold(False)
         self.fontBold = QFont()
@@ -199,86 +218,54 @@ class MainWindow(QMainWindow):
         try:
             self.updatePruefung(meldungNurWennUpdateVerfuegbar=True)
         except Exception as e:
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Updateprüfung nicht möglich.\nBitte überprüfen Sie Ihre Internetverbindung." + str(e), QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Updateprüfung nicht möglich.\nBitte überprüfen Sie Ihre Internetverbindung." + str(e), QMessageBox.StandardButton.Ok)
             mb.exec()
             logger.logger.warning("Updateprüfung nicht möglich: " + str(e))
+
+        # Verfügbare Version abrufen
+        try:
+            response = requests.get("https://api.github.com/repos/retconx/" + _gdtToolKlein + "/releases/latest", headers={"Authorization" : "Bearer " + gth})
+            githubRelaseTag = response.json()["tag_name"]
+            global _verfuegbareVersion
+            _verfuegbareVersion = githubRelaseTag[1:] # ohne v
+        except Exception as e:
+            logger.logger.error("Fehler beim GitHub-Abruf der aktuellen Version von " + _gdtToolGross + ": " + str(e))
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Problem beim GitHub-Abruf der verfügbaren Version: " + str(e), QMessageBox.StandardButton.Ok)
+            mb.exec()
 
         # Foromularaufbau
         self.widget = QWidget()
         mainLayoutV = QVBoxLayout()
         gdtToolsTabelleLayoutG = QGridLayout()
-        labelGdtTool = QLabel("GDT-Tool")
-        labelGdtTool.setFont(self.fontBold)
-        labelProgrammverzeichnis = QLabel("Programmverzeichnis")
-        labelProgrammverzeichnis.setFont(self.fontBold)
-        labelInstallierteVersion = QLabel("Installiert")
-        labelInstallierteVersion.setFont(self.fontBold)
-        labelAktuelleVersion = QLabel("Aktuell (GitHub)")
-        labelAktuelleVersion.setFont(self.fontBold)
-        gdtToolsTabelleLayoutG.addWidget(labelGdtTool, 0, 0)
-        gdtToolsTabelleLayoutG.addWidget(labelProgrammverzeichnis, 0, 1)
-        gdtToolsTabelleLayoutG.addWidget(labelInstallierteVersion, 0, 3)
-        gdtToolsTabelleLayoutG.addWidget(labelAktuelleVersion, 0, 4)
-
-        labelInstallierteTools = []
-        self.lineEditProgrammverzeichnisse = []
-        self.pushButtonProgrammverzeichnisse = []
-        self.labelInstallierteVersionen = []
-        self.labelAktuelleVersionen = []
-        self.pushButtonAktualisieren = []
-        configPfadAllgemein = os.path.expanduser("~\\appdata\\local")
-        if not "win32" in sys.platform:
-            configPfadAllgemein = os.path.expanduser("~/.config")
-        i = 0
-        spaltenbreite = 120
-        for gdtTool in gdtTools:
-            labelInstallierteTools.append(QLabel(gdtTools[gdtTool])) 
-            labelInstallierteTools[i].setFixedWidth(spaltenbreite)
-            gdtToolsTabelleLayoutG.addWidget(labelInstallierteTools[i], i + 1, 0)
-            pv = self.configIni["Programmverzeichnisse"][gdtTool]
-            self.lineEditProgrammverzeichnisse.append(QLineEdit(pv))
-            self.lineEditProgrammverzeichnisse[i].setFixedWidth(200)
-            self.lineEditProgrammverzeichnisse[i].setToolTip(pv)
-            gdtToolsTabelleLayoutG.addWidget(self.lineEditProgrammverzeichnisse[i], i + 1, 1)
-            self.pushButtonProgrammverzeichnisse.append(QPushButton("..."))
-            self.pushButtonProgrammverzeichnisse[i].setToolTip("Programmverzeichnis auswählen")
-            self.pushButtonProgrammverzeichnisse[i].clicked.connect(lambda checked = False, gdtToolNr = i: self.pushButtonProgrammverzeichnisClicked(checked, gdtToolNr))
-            gdtToolsTabelleLayoutG.addWidget(self.pushButtonProgrammverzeichnisse[i], i + 1, 2)
-            iv = "-" 
-            if os.path.exists(os.path.join(configPfadAllgemein, gdtTool, "config.ini")):
-                configIniTemp = configparser.ConfigParser()
-                configIniTempPfad = os.path.join(configPfadAllgemein, gdtTool)
-                configIniTemp.read(os.path.join(configIniTempPfad, "config.ini"), encoding="utf-8")
-                iv = configIniTemp["Allgemein"]["version"]
-            self.labelInstallierteVersionen.append(QLabel("V" + iv))
-            if iv == "-":
-                self.labelInstallierteVersionen[i].setText(iv)
-                self.labelInstallierteVersionen[i].setFixedWidth(spaltenbreite)
-            gdtToolsTabelleLayoutG.addWidget(self.labelInstallierteVersionen[i], i + 1, 3)
-            lv = "?"
-            try:
-                response = requests.get("https://api.github.com/repos/retconx/" + str(gdtTool) + "/releases/latest", headers={"Authorization" : "Bearer " + gth})
-                githubRelaseTag = response.json()["tag_name"]
-                lv = githubRelaseTag[1:] # ohne v
-            except Exception as e:
-                logger.logger.error("Fehler beim GitHub-Abruf der aktuellen Version von " + gdtTools[gdtTool] + ": " + str(e))
-            self.labelAktuelleVersionen.append(QLabel("V" + lv))
-            if lv == "?":
-                self.labelAktuelleVersionen[i].setText(lv)
-            self.labelAktuelleVersionen[i].setFixedWidth(spaltenbreite)
-            gdtToolsTabelleLayoutG.addWidget(self.labelAktuelleVersionen[i], i + 1, 4)
-            self.pushButtonAktualisieren.append(QPushButton("Aktualisieren"))
-            self.pushButtonProgrammverzeichnisse[i].setEnabled(self.labelInstallierteVersionen[i].text() != "-")
-            self.pushButtonAktualisieren[i].clicked.connect(lambda checked = False, gdtToolNr = i, latestVersion = lv: self.pushButtonAktualisierenClicked(checked, gdtToolNr, latestVersion))
-            aktualisierungMoeglich = self.checkProgrammverzeichnisErreichbarkeit(i) and self.updateVerfuegbar(i)
-            self.pushButtonAktualisieren[i].setEnabled(aktualisierungMoeglich)
-            gdtToolsTabelleLayoutG.addWidget(self.pushButtonAktualisieren[i], i + 1, 5)
-            i += 1
-        self.pushButtonSchliessen = QPushButton("Updater schließen")
+        buttonsLayoutH = QHBoxLayout()
+        labelInstallierteVersion = QLabel("Installierte Version:")
+        self.lineEditInstallierteVersion = QLineEdit(_installierteVersion)
+        self.lineEditInstallierteVersion.setReadOnly(True)
+        labelVerfuegbareVersion = QLabel("Verfügbare Version:")
+        self.lineEditVerfuegbareVersion = QLineEdit(_verfuegbareVersion)
+        self.lineEditVerfuegbareVersion.setReadOnly(True)
+        labelProgrammverzeichnis = QLabel("Programmverzeichnis:")
+        self.lineEditProgrammverzeichnis = QLineEdit(_programmverzeichnis)
+        self.pushButtonProgrammverzeichnisAuswaehlen = QPushButton("...")
+        self.pushButtonProgrammverzeichnisAuswaehlen.clicked.connect(self.pushButtonProgrammverzeichnisAuswaehlenClicked)
+        self.pushButtonUpdate = QPushButton("Update")
+        self.pushButtonUpdate.clicked.connect(self.pushButtonUpdateClicked)
+        self.pushButtonSchliessen= QPushButton("Schließen")
         self.pushButtonSchliessen.clicked.connect(self.pushButtonSchliessenClicked)
 
+        gdtToolsTabelleLayoutG.addWidget(labelInstallierteVersion, 0, 0)
+        gdtToolsTabelleLayoutG.addWidget(self.lineEditInstallierteVersion, 0, 1)
+        gdtToolsTabelleLayoutG.addWidget(labelVerfuegbareVersion, 1, 0)
+        gdtToolsTabelleLayoutG.addWidget(self.lineEditVerfuegbareVersion, 1, 1)
+        gdtToolsTabelleLayoutG.addWidget(labelProgrammverzeichnis, 2, 0)
+        gdtToolsTabelleLayoutG.addWidget(self.lineEditProgrammverzeichnis, 2, 1)
+        gdtToolsTabelleLayoutG.addWidget(self.pushButtonProgrammverzeichnisAuswaehlen, 2, 2)
+
+        buttonsLayoutH.addWidget(self.pushButtonUpdate)
+        buttonsLayoutH.addWidget(self.pushButtonSchliessen)
+
         mainLayoutV.addLayout(gdtToolsTabelleLayoutG)
-        mainLayoutV.addWidget(self.pushButtonSchliessen)
+        mainLayoutV.addLayout(buttonsLayoutH)
 
         self.status = QStatusBar()
         self.progress = QProgressBar()
@@ -297,10 +284,6 @@ class MainWindow(QMainWindow):
         updateAction = QAction("Auf Update prüfen", self)
         updateAction.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
         updateAction.triggered.connect(self.updatePruefung) 
-        einstellungenMenu = menubar.addMenu("Einstellungen")
-        einstellungenImportExportAction = QAction("Im- /Exportieren", self)
-        einstellungenImportExportAction.triggered.connect(self.einstellungenImportExport) 
-        einstellungenImportExportAction.setMenuRole(QAction.MenuRole.NoRole)
         hilfeMenu = menubar.addMenu("Hilfe")
         hilfeWikiAction = QAction("GDT-Tools Updater Wiki", self)
         hilfeWikiAction.triggered.connect(self.gdtToolsUpdaterWiki)
@@ -316,7 +299,6 @@ class MainWindow(QMainWindow):
         
         anwendungMenu.addAction(aboutAction)
         anwendungMenu.addAction(updateAction)
-        einstellungenMenu.addAction(einstellungenImportExportAction)
         hilfeMenu.addAction(hilfeWikiAction)
         hilfeMenu.addSeparator()
         hilfeMenu.addAction(hilfeUpdateAction)
@@ -326,7 +308,19 @@ class MainWindow(QMainWindow):
         hilfeMenu.addSeparator()
         hilfeMenu.addAction(hilfeLogExportieren)
 
-    def checkProgrammverzeichnisErreichbarkeit(self, gdtToolNr:int):
+        if not versionVeraltet(_installierteVersion, _verfuegbareVersion):
+            mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Es ist keine neuere " + _gdtToolGross + "-Version als die bereits installierte verfügbar.\n" + _gdtToolGross + "-Updater wird beendet.", QMessageBox.StandardButton.Ok)
+            mb.exec()
+            sys.exit()
+
+        if not self.checkProgrammverzeichnisErreichbarkeit():
+            mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Im ausgewählten Verzeichnis befindet sich keine Programmdatei von " + _gdtToolGross + ".", QMessageBox.StandardButton.Ok)
+            mb.exec()
+            self.pushButtonUpdate.setEnabled(False)
+            self.lineEditProgrammverzeichnis.setFocus()
+            self.lineEditProgrammverzeichnis.selectAll()
+
+    def checkProgrammverzeichnisErreichbarkeit(self):
         """
         Prüft, ob das Programmverzeichnis existiert und ob dieses die Programmdatei des entsprechenden GDT-Tools enthält
         Parameter:
@@ -335,40 +329,20 @@ class MainWindow(QMainWindow):
             True oder False
         """
         ok = False
-        if gdtToolNr > -1 and gdtToolNr < len(gdtTools):
-            gdtTool = list(gdtTools)[gdtToolNr]
-            programmverzeichnisExistiert = os.path.exists(self.lineEditProgrammverzeichnisse[gdtToolNr].text())
-            if programmverzeichnisExistiert and "win32" in sys.platform:
-                ok = gdtTool + ".exe" in os.listdir(self.lineEditProgrammverzeichnisse[gdtToolNr].text())
-            elif programmverzeichnisExistiert and "darwin" in sys.platform:
-                ok = gdtTools[gdtTool] + ".app" in os.listdir(self.lineEditProgrammverzeichnisse[gdtToolNr].text())
-            elif programmverzeichnisExistiert and "linux" in sys.platform:
-                ok = gdtTool in os.listdir(self.lineEditProgrammverzeichnisse[gdtToolNr].text())
-            if not ok:
-                self.lineEditProgrammverzeichnisse[gdtToolNr].setStyleSheet("background:rgb(255,200,200)")
-            else:
-                self.lineEditProgrammverzeichnisse[gdtToolNr].setStyleSheet("background:rgb(255,255,255)") 
-        elif gdtToolNr == -1:
-            for i in range(len(gdtTools)):
-                if not self.checkProgrammverzeichnisErreichbarkeit(i):
-                    ok = False
-                    break
+        programmverzeichnisExistiert = os.path.exists(self.lineEditProgrammverzeichnis.text())
+        if programmverzeichnisExistiert and "win32" in sys.platform:
+            ok = _gdtToolKlein + ".exe" in os.listdir(self.lineEditProgrammverzeichnis.text())
+        elif programmverzeichnisExistiert and "darwin" in sys.platform:
+            ok = _gdtToolGross + ".app" in os.listdir(self.lineEditProgrammverzeichnis.text())
+        elif programmverzeichnisExistiert and "linux" in sys.platform:
+            ok = _gdtToolKlein in os.listdir(self.lineEditProgrammverzeichnis.text())
+        if not ok:
+            self.lineEditProgrammverzeichnis.setStyleSheet("background:rgb(255,200,200)")
+        else:
+            self.lineEditProgrammverzeichnis.setStyleSheet("background:rgb(255,255,255)") 
         return ok
-    
-    def updateVerfuegbar(self, gdtToolNr:int):
-        """
-        Prüft, ob ein Update verfügbar ist
-        Parameter:
-            gdtToolNr:int
-        Rückgabe:
-            True oder False
-        """
-        iv = self.labelInstallierteVersionen[gdtToolNr].text()
-        lv = self.labelAktuelleVersionen[gdtToolNr].text()
-        return iv != "-" and lv != "?" and versionVeraltet(iv[1:], lv[1:]) # ohne V)
 
-    def pushButtonProgrammverzeichnisClicked(self, checked, gdtToolNr):
-        gdtTool = list(gdtTools)[gdtToolNr]
+    def pushButtonProgrammverzeichnisAuswaehlenClicked(self):
         fd = QFileDialog(self)
         fd.setFileMode(QFileDialog.FileMode.Directory)
         fd.setWindowTitle("Programmverzeichnis auswählen")
@@ -376,40 +350,34 @@ class MainWindow(QMainWindow):
         fd.setLabelText(QFileDialog.DialogLabel.Accept, "Speichern")
         fd.setLabelText(QFileDialog.DialogLabel.Reject, "Abbrechen")
         if fd.exec() == 1:
-            logger.logger.info("Programmverzeichnis " + fd.directory().absolutePath() + " für " + gdtTools[gdtTool] + " ausgewählt")
-            self.lineEditProgrammverzeichnisse[gdtToolNr].setText(fd.directory().absolutePath())
-            if not self.checkProgrammverzeichnisErreichbarkeit(gdtToolNr):
-                mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von GDT-Tools Updater", "Im ausgewählten Verzeichnis befindet sich keine Programmdatei von " + gdtTools[gdtTool] + ".", QMessageBox.StandardButton.Ok)
+            logger.logger.info("Programmverzeichnis " + fd.directory().absolutePath() + " ausgewählt")
+            self.lineEditProgrammverzeichnis.setText(fd.directory().absolutePath())
+            if not self.checkProgrammverzeichnisErreichbarkeit():
+                mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Im ausgewählten Verzeichnis befindet sich keine Programmdatei von " + _gdtToolGross + ".", QMessageBox.StandardButton.Ok)
                 mb.exec()
-            elif versionVeraltet(self.labelInstallierteVersionen[gdtToolNr].text()[1:], self.labelAktuelleVersionen[gdtToolNr].text()[1:]):
-                self.pushButtonAktualisieren[gdtToolNr].setEnabled(True)
-            try:
-                self.configIni["Programmverzeichnisse"][list(gdtTools)[gdtToolNr]] = fd.directory().absolutePath()
-                with open(os.path.join(self.configPath, "config.ini"), "w", encoding="utf-8") as configfile:
-                    self.configIni.write(configfile)
-                    logger.logger.info("Programmverzeichnis " + fd.directory().absolutePath() + " für " + gdtTools[gdtTool] + " gespeichert")
-                    self.status.showMessage("Programmverzeichnis für " + gdtTools[gdtTool] + " gespeichert")
-            except Exception as e:
-                mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Fehler beim Speichern des Programmverzeichnisses " + fd.directory().absolutePath(), QMessageBox.StandardButton.Ok)
-                mb.exec()
-                logger.logger.error("Fehler beim Speichern des Programmverzeichnisses " + fd.directory().absolutePath() + " für " + gdtTools[gdtTool] + ": " + str(e))
+                self.pushButtonUpdate.setEnabled(False)
+            elif versionVeraltet(self.lineEditInstallierteVersion.text(), self.lineEditVerfuegbareVersion.text()):
+                self.pushButtonUpdate.setEnabled(True)
+                global _programmverzeichnis
+                _programmverzeichnis = self.lineEditProgrammverzeichnis.text()
     
-    def pushButtonAktualisierenClicked(self, checked, gdtToolNr, latestVersion):
-        programmverzeichnis = self.lineEditProgrammverzeichnisse[gdtToolNr].text()
-        if os.path.exists(self.lineEditProgrammverzeichnisse[gdtToolNr].text()):
+    def pushButtonUpdateClicked(self):
+        if os.path.exists(self.lineEditProgrammverzeichnis.text()):
             self.progress.setValue(1)
-            self.pushButtonAktualisieren[gdtToolNr].setEnabled(False)
+            self.pushButtonProgrammverzeichnisAuswaehlen.setEnabled(False)
+            self.pushButtonUpdate.setEnabled(False)
             self.pushButtonSchliessen.setEnabled(False)
-            worker = class_updateWorker.UpdateWorker(gdtTools, programmverzeichnis, gdtToolNr, latestVersion)
+            worker = class_updateWorker.UpdateWorker(_gdtToolKlein, _gdtToolGross, _programmverzeichnis, _verfuegbareVersion)
             worker.signals.statusmeldung.connect(self.updateStatusBar)
             worker.signals.updateErfolgreich.connect(self.updateErfolgreich)
             worker.signals.progressProzent.connect(self.updateProgressBar)
+            logger.logger.info("Update wird gestartet: " + _gdtToolKlein + ", " + _programmverzeichnis + ", " + _verfuegbareVersion)
             self.threadpool.start(worker)
         else:
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Das Programmverzeichnis existiert nicht.", QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Das Programmverzeichnis existiert nicht.", QMessageBox.StandardButton.Ok)
             mb.exec()
-            self.lineEditProgrammverzeichnisse[gdtToolNr].setFocus()
-            self.lineEditProgrammverzeichnisse[gdtToolNr].selectAll()
+            self.lineEditProgrammverzeichnis.setFocus()
+            self.lineEditProgrammverzeichnis.selectAll()
 
     def updateStatusBar(self, message):
         self.status.showMessage(message)
@@ -417,43 +385,50 @@ class MainWindow(QMainWindow):
     def updateProgressBar(self, prozent):
         self.progress.setValue(prozent)
 
-    def updateErfolgreich(self, gdtToolNr, erfolgreich):
-        gdtTool = list(gdtTools)[gdtToolNr]
+    def updateErfolgreich(self, erfolgreich):
         if erfolgreich:
-            self.pushButtonAktualisieren[gdtToolNr].setEnabled(False)
-            mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von GDT-Tools Updater", "Das " + gdtTools[gdtTool] + "-Update war erfolgreich. Für die Aktualisierung der Konfiguration muss " + gdtTools[gdtTool] + " einmalig gestartet werden.\nSoll GDT-Tools Updater nun beendet und " + gdtTools[gdtTool] + " gestartet werden?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            logger.logger.info("Update erfolgreich")
+            self.pushButtonUpdate.setEnabled(False)
+            mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Das " + _gdtToolGross + "-Update war erfolgreich. Für die Aktualisierung der Konfiguration muss " + _gdtToolGross + " einmalig gestartet werden.\nSoll GDT-Tools Updater nun beendet und " + _gdtToolGross + " gestartet werden?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             mb.setDefaultButton(QMessageBox.StandardButton.Yes)
             mb.button(QMessageBox.StandardButton.Yes).setText("Ja")
             mb.button(QMessageBox.StandardButton.No).setText("Nein")
             if mb.exec() == QMessageBox.StandardButton.Yes:
-                atexit.register(lambda gtn = gdtToolNr: self.gdtToolStarten(gtn))
+                logger.logger.info(_gdtToolGross + " soll gestartet werden")
+                atexit.register(self.gdtToolStarten)
+                logger.logger.info("GDT-Updater schließen")
                 sys.exit()
         else:
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Das " + gdtTools[gdtTool] + "-Update konnte nicht durchgeführt werden.", QMessageBox.StandardButton.Ok)
+            logger.logger.error("Update nicht erfolgreich")
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Das " + _gdtToolGross + "-Update konnte nicht durchgeführt werden.", QMessageBox.StandardButton.Ok)
             mb.exec()
-            self.pushButtonAktualisieren[gdtToolNr].setEnabled(True)
+            self.pushButtonUpdate.setEnabled(True)
         self.pushButtonSchliessen.setEnabled(True)
         
-    def gdtToolStarten(self, gdtToolNr):
-        gdtTool = list(gdtTools)[gdtToolNr]
-        logger.logger.info(os.path.join(self.lineEditProgrammverzeichnisse[gdtToolNr].text(), gdtTools[gdtTool] + ".exe") + " starten")
+    def gdtToolStarten(self):
         if "win32" in sys.platform:
-            subprocess.run([os.path.join(self.lineEditProgrammverzeichnisse[gdtToolNr].text(), gdtTools[gdtTool] + ".exe")])
+            pfad = [os.path.join(self.lineEditProgrammverzeichnis.text(), _gdtToolKlein + ".exe")]
+            logger.logger.info(_gdtToolGross + " starten: " + str.join(" ", pfad))
+            subprocess.Popen(pfad) # type: ignore
         elif "darwin" in sys.platform:
-            subprocess.run(["open", os.path.join(self.lineEditProgrammverzeichnisse[gdtToolNr].text(), gdtTools[gdtTool] + ".app")])
+            pfad = ["open", "-a", os.path.join(self.lineEditProgrammverzeichnis.text(), _gdtToolGross + ".app")]
+            logger.logger.info(_gdtToolGross + " starten: " + str.join(" ", pfad))
+            subprocess.Popen(pfad)
         elif "linux" in sys.platform:
-            subprocess.run([os.path.join(self.lineEditProgrammverzeichnisse[gdtToolNr].text(), gdtTools[gdtTool])])
+            pfad = [os.path.join(self.lineEditProgrammverzeichnis.text(), _gdtToolKlein)]
+            logger.logger.info(_gdtToolGross + " starten: " + str.join(" ", pfad))
+            subprocess.Popen(pfad)
 
     def updatePruefung(self, meldungNurWennUpdateVerfuegbar = False):
         response = requests.get("https://api.github.com/repos/retconx/gdttoolsupdater/releases/latest", headers={"Authorization" : "Bearer " + gth})
         githubRelaseTag = response.json()["tag_name"]
         latestVersion = githubRelaseTag[1:] # ohne v
         if versionVeraltet(self.version, latestVersion):
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Die aktuellere GDT-Tools Updater-Version " + latestVersion + " ist auf <a href='https://github.com/retconx/gdttoolsupdater/releases'>Github</a> verfügbar.", QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Die aktuellere GDT-Tools Updater-Version " + latestVersion + " ist auf <a href='https://github.com/retconx/gdttoolsupdater/releases'>Github</a> verfügbar.", QMessageBox.StandardButton.Ok)
             mb.setTextFormat(Qt.TextFormat.RichText)
             mb.exec()
         elif not meldungNurWennUpdateVerfuegbar:
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Sie nutzen die aktuelle GDT-Tools Updater-Version.", QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Sie nutzen die aktuelle GDT-Tools Updater-Version.", QMessageBox.StandardButton.Ok)
             mb.exec()
             
     def ueberGdtToolsUpdater(self):
@@ -474,19 +449,14 @@ class MainWindow(QMainWindow):
                 if shutil.copytree(os.path.join(basedir, "log"), os.path.join(downloadPath, "Log_GdtToolsUpdater"), dirs_exist_ok=True):
                     shutil.make_archive(os.path.join(downloadPath, "Log_GdtToolsUpdater"), "zip", root_dir=os.path.join(downloadPath, "Log_GdtToolsUpdater"))
                     shutil.rmtree(os.path.join(downloadPath, "Log_GdtToolsUpdater"))
-                    mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Das Log-Verzeichnis wurde in den Ordner " + downloadPath + " kopiert.", QMessageBox.StandardButton.Ok)
+                    mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Das Log-Verzeichnis wurde in den Ordner " + downloadPath + " kopiert.", QMessageBox.StandardButton.Ok)
                     mb.exec()
             except Exception as e:
-                mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Problem beim Download des Log-Verzeichnisses: " + str(e), QMessageBox.StandardButton.Ok)
+                mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Problem beim Download des Log-Verzeichnisses: " + str(e), QMessageBox.StandardButton.Ok)
                 mb.exec()
         else:
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von GDT-Tools Updater", "Das Log-Verzeichnis wurde nicht gefunden.", QMessageBox.StandardButton.Ok)
+            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Das Log-Verzeichnis wurde nicht gefunden.", QMessageBox.StandardButton.Ok)
             mb.exec() 
-
-    def einstellungenImportExport(self):
-        de = dialogEinstellungenImportExport.EinstellungenImportExport(self.configPath)
-        if de.exec() == 1:
-            pass
     
     def gdtToolsUpdaterWiki(self, link):
         QDesktopServices.openUrl("https://github.com/retconx/gdttoolsupdater/wiki")
