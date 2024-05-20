@@ -43,16 +43,23 @@ gdtTools = {
     "signogdt": "SignoGDT"
     }
 
+startOhneArgumente = False
+_gdtToolKlein = ""
+_gdtToolGross = ""
+_installierteVersion = ""
+_programmverzeichnis = ""
 if len(sys.argv) != 4:
     logger.logger.error("Argumentübergabe fehlerhaft: " + str.join(",", sys.argv))
-_gdtToolKlein = str(sys.argv[1])
-logger.logger.info("GDT-Tool: " + _gdtToolKlein)
-_gdtToolGross = gdtTools[_gdtToolKlein]
-_installierteVersion = str(sys.argv[2])
-logger.logger.info("Installierte Version: " + _installierteVersion)
-_programmverzeichnis = str(sys.argv[3])
-logger.logger.info("Programmverzeichnis: " + _programmverzeichnis)
-_verfuegbareVersion = "?"
+    startOhneArgumente = True
+if not startOhneArgumente:
+    _gdtToolKlein = str(sys.argv[1])
+    logger.logger.info("GDT-Tool: " + _gdtToolKlein)
+    _gdtToolGross = gdtTools[_gdtToolKlein]
+    _installierteVersion = str(sys.argv[2])
+    logger.logger.info("Installierte Version: " + _installierteVersion)
+    _programmverzeichnis = str(sys.argv[3])
+    logger.logger.info("Programmverzeichnis: " + _programmverzeichnis)
+    _verfuegbareVersion = "?"
 
 def versionVeraltet(versionAktuell:str, versionVergleich:str):
     """
@@ -222,104 +229,110 @@ class MainWindow(QMainWindow):
             mb.exec()
             logger.logger.warning("Updateprüfung nicht möglich: " + str(e))
 
-        # Verfügbare Version abrufen
-        try:
-            response = requests.get("https://api.github.com/repos/retconx/" + _gdtToolKlein + "/releases/latest", headers={"Authorization" : "Bearer " + gth})
-            githubRelaseTag = response.json()["tag_name"]
-            global _verfuegbareVersion
-            _verfuegbareVersion = githubRelaseTag[1:] # ohne v
-            logger.logger.info("Verfügbare Version: " + _verfuegbareVersion)
-        except Exception as e:
-            logger.logger.error("Fehler beim GitHub-Abruf der aktuellen Version von " + _gdtToolGross + ": " + str(e))
-            mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Problem beim GitHub-Abruf der verfügbaren Version: " + str(e), QMessageBox.StandardButton.Ok)
-            mb.exec()
-
-        # Foromularaufbau
-        self.widget = QWidget()
-        mainLayoutV = QVBoxLayout()
-        gdtToolsTabelleLayoutG = QGridLayout()
-        buttonsLayoutH = QHBoxLayout()
-        labelInstallierteVersion = QLabel("Installierte Version:")
-        self.lineEditInstallierteVersion = QLineEdit(_installierteVersion)
-        self.lineEditInstallierteVersion.setReadOnly(True)
-        labelVerfuegbareVersion = QLabel("Verfügbare Version:")
-        self.lineEditVerfuegbareVersion = QLineEdit(_verfuegbareVersion)
-        self.lineEditVerfuegbareVersion.setReadOnly(True)
-        labelProgrammverzeichnis = QLabel("Programmverzeichnis:")
-        self.lineEditProgrammverzeichnis = QLineEdit(_programmverzeichnis)
-        self.pushButtonProgrammverzeichnisAuswaehlen = QPushButton("...")
-        self.pushButtonProgrammverzeichnisAuswaehlen.clicked.connect(self.pushButtonProgrammverzeichnisAuswaehlenClicked)
-        self.pushButtonUpdate = QPushButton("Update")
-        self.pushButtonUpdate.clicked.connect(self.pushButtonUpdateClicked)
-        self.pushButtonSchliessen= QPushButton("Schließen")
-        self.pushButtonSchliessen.clicked.connect(self.pushButtonSchliessenClicked)
-
-        gdtToolsTabelleLayoutG.addWidget(labelInstallierteVersion, 0, 0)
-        gdtToolsTabelleLayoutG.addWidget(self.lineEditInstallierteVersion, 0, 1)
-        gdtToolsTabelleLayoutG.addWidget(labelVerfuegbareVersion, 1, 0)
-        gdtToolsTabelleLayoutG.addWidget(self.lineEditVerfuegbareVersion, 1, 1)
-        gdtToolsTabelleLayoutG.addWidget(labelProgrammverzeichnis, 2, 0)
-        gdtToolsTabelleLayoutG.addWidget(self.lineEditProgrammverzeichnis, 2, 1)
-        gdtToolsTabelleLayoutG.addWidget(self.pushButtonProgrammverzeichnisAuswaehlen, 2, 2)
-
-        buttonsLayoutH.addWidget(self.pushButtonUpdate)
-        buttonsLayoutH.addWidget(self.pushButtonSchliessen)
-
-        mainLayoutV.addLayout(gdtToolsTabelleLayoutG)
-        mainLayoutV.addLayout(buttonsLayoutH)
-
-        self.status = QStatusBar()
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        self.status.addPermanentWidget(self.progress)
-        self.setStatusBar(self.status)
-        self.widget.setLayout(mainLayoutV)
-        self.setCentralWidget(self.widget)
-
-        # Menü
-        menubar = self.menuBar()
-        anwendungMenu = menubar.addMenu("")
-        aboutAction = QAction(self)
-        aboutAction.setMenuRole(QAction.MenuRole.AboutRole)
-        aboutAction.triggered.connect(self.ueberGdtToolsUpdater) 
-        updateAction = QAction("Auf Update prüfen", self)
-        updateAction.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-        updateAction.triggered.connect(self.updatePruefung) 
-        hilfeMenu = menubar.addMenu("Hilfe")
-        hilfeWikiAction = QAction("GDT-Tools Updater Wiki", self)
-        hilfeWikiAction.triggered.connect(self.gdtToolsUpdaterWiki)
-        hilfeUpdateAction = QAction("Auf Update prüfen", self)
-        hilfeUpdateAction.triggered.connect(self.updatePruefung)
-        hilfeUeberAction = QAction("Über GDT-Tools Updater", self)
-        hilfeUeberAction.setMenuRole(QAction.MenuRole.NoRole)
-        hilfeUeberAction.triggered.connect(self.ueberGdtToolsUpdater)
-        hilfeEulaAction = QAction("Lizenzvereinbarung (EULA)", self)
-        hilfeEulaAction.triggered.connect(self.eula) 
-        hilfeLogExportieren = QAction("Log-Verzeichnis exportieren", self)
-        hilfeLogExportieren.triggered.connect(self.logExportieren) 
-        
-        anwendungMenu.addAction(aboutAction)
-        anwendungMenu.addAction(updateAction)
-        hilfeMenu.addAction(hilfeWikiAction)
-        hilfeMenu.addSeparator()
-        hilfeMenu.addAction(hilfeUpdateAction)
-        hilfeMenu.addSeparator()
-        hilfeMenu.addAction(hilfeUeberAction)
-        hilfeMenu.addAction(hilfeEulaAction)
-        hilfeMenu.addSeparator()
-        hilfeMenu.addAction(hilfeLogExportieren)
-
-        if not versionVeraltet(_installierteVersion, _verfuegbareVersion):
-            mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Es ist keine neuere " + _gdtToolGross + "-Version als die bereits installierte verfügbar.\n" + _gdtToolGross + "-Updater wird beendet.", QMessageBox.StandardButton.Ok)
+        if startOhneArgumente:
+            mb = QMessageBox(QMessageBox.Icon.Information, "Hinweis von GDT-Toools Updater", "Der Updater kann nur von einem GDT-Tool aus gestartet weden.", QMessageBox.StandardButton.Ok)
             mb.exec()
             sys.exit()
+        else:
+            # Verfügbare Version abrufen
+            try:
+                response = requests.get("https://api.github.com/repos/retconx/" + _gdtToolKlein + "/releases/latest", headers={"Authorization" : "Bearer " + gth})
+                githubRelaseTag = response.json()["tag_name"]
+                global _verfuegbareVersion
+                _verfuegbareVersion = githubRelaseTag[1:] # ohne v
+                logger.logger.info("Verfügbare Version: " + _verfuegbareVersion)
+            except Exception as e:
+                logger.logger.error("Fehler beim GitHub-Abruf der aktuellen Version von " + _gdtToolGross + ": " + str(e))
+                mb = QMessageBox(QMessageBox.Icon.Warning, "Hinweis von " + _gdtToolGross + "-Updater", "Problem beim GitHub-Abruf der verfügbaren Version: " + str(e), QMessageBox.StandardButton.Ok)
+                mb.exec()
 
-        if not self.checkProgrammverzeichnisErreichbarkeit():
-            mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Im ausgewählten Verzeichnis befindet sich keine Programmdatei von " + _gdtToolGross + ".", QMessageBox.StandardButton.Ok)
-            mb.exec()
-            self.pushButtonUpdate.setEnabled(False)
-            self.lineEditProgrammverzeichnis.setFocus()
-            self.lineEditProgrammverzeichnis.selectAll()
+            # Foromularaufbau
+        
+            self.widget = QWidget()
+            mainLayoutV = QVBoxLayout()
+            gdtToolsTabelleLayoutG = QGridLayout()
+            buttonsLayoutH = QHBoxLayout()
+            labelInstallierteVersion = QLabel("Installierte Version:")
+            self.lineEditInstallierteVersion = QLineEdit(_installierteVersion)
+            self.lineEditInstallierteVersion.setReadOnly(True)
+            labelVerfuegbareVersion = QLabel("Verfügbare Version:")
+            self.lineEditVerfuegbareVersion = QLineEdit(_verfuegbareVersion)
+            self.lineEditVerfuegbareVersion.setReadOnly(True)
+            labelProgrammverzeichnis = QLabel("Programmverzeichnis:")
+            self.lineEditProgrammverzeichnis = QLineEdit(_programmverzeichnis)
+            self.pushButtonProgrammverzeichnisAuswaehlen = QPushButton("...")
+            self.pushButtonProgrammverzeichnisAuswaehlen.clicked.connect(self.pushButtonProgrammverzeichnisAuswaehlenClicked)
+            self.pushButtonUpdate = QPushButton("Update")
+            self.pushButtonUpdate.clicked.connect(self.pushButtonUpdateClicked)
+            self.pushButtonSchliessen= QPushButton("Schließen")
+            self.pushButtonSchliessen.clicked.connect(self.pushButtonSchliessenClicked)
+
+            gdtToolsTabelleLayoutG.addWidget(labelInstallierteVersion, 0, 0)
+            gdtToolsTabelleLayoutG.addWidget(self.lineEditInstallierteVersion, 0, 1)
+            gdtToolsTabelleLayoutG.addWidget(labelVerfuegbareVersion, 1, 0)
+            gdtToolsTabelleLayoutG.addWidget(self.lineEditVerfuegbareVersion, 1, 1)
+            gdtToolsTabelleLayoutG.addWidget(labelProgrammverzeichnis, 2, 0)
+            gdtToolsTabelleLayoutG.addWidget(self.lineEditProgrammverzeichnis, 2, 1)
+            gdtToolsTabelleLayoutG.addWidget(self.pushButtonProgrammverzeichnisAuswaehlen, 2, 2)
+
+            buttonsLayoutH.addWidget(self.pushButtonUpdate)
+            buttonsLayoutH.addWidget(self.pushButtonSchliessen)
+
+            mainLayoutV.addLayout(gdtToolsTabelleLayoutG)
+            mainLayoutV.addLayout(buttonsLayoutH)
+
+            self.status = QStatusBar()
+            self.progress = QProgressBar()
+            self.progress.setRange(0, 100)
+            self.status.addPermanentWidget(self.progress)
+            self.setStatusBar(self.status)
+            self.widget.setLayout(mainLayoutV)
+            self.setCentralWidget(self.widget)
+
+            # Menü
+            menubar = self.menuBar()
+            anwendungMenu = menubar.addMenu("")
+            aboutAction = QAction(self)
+            aboutAction.setMenuRole(QAction.MenuRole.AboutRole)
+            aboutAction.triggered.connect(self.ueberGdtToolsUpdater) 
+            updateAction = QAction("Auf Update prüfen", self)
+            updateAction.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+            updateAction.triggered.connect(self.updatePruefung) 
+            hilfeMenu = menubar.addMenu("Hilfe")
+            hilfeWikiAction = QAction("GDT-Tools Updater Wiki", self)
+            hilfeWikiAction.triggered.connect(self.gdtToolsUpdaterWiki)
+            hilfeUpdateAction = QAction("Auf Update prüfen", self)
+            hilfeUpdateAction.triggered.connect(self.updatePruefung)
+            hilfeUeberAction = QAction("Über GDT-Tools Updater", self)
+            hilfeUeberAction.setMenuRole(QAction.MenuRole.NoRole)
+            hilfeUeberAction.triggered.connect(self.ueberGdtToolsUpdater)
+            hilfeEulaAction = QAction("Lizenzvereinbarung (EULA)", self)
+            hilfeEulaAction.triggered.connect(self.eula) 
+            hilfeLogExportieren = QAction("Log-Verzeichnis exportieren", self)
+            hilfeLogExportieren.triggered.connect(self.logExportieren) 
+            
+            anwendungMenu.addAction(aboutAction)
+            anwendungMenu.addAction(updateAction)
+            hilfeMenu.addAction(hilfeWikiAction)
+            hilfeMenu.addSeparator()
+            hilfeMenu.addAction(hilfeUpdateAction)
+            hilfeMenu.addSeparator()
+            hilfeMenu.addAction(hilfeUeberAction)
+            hilfeMenu.addAction(hilfeEulaAction)
+            hilfeMenu.addSeparator()
+            hilfeMenu.addAction(hilfeLogExportieren)
+
+            if not versionVeraltet(_installierteVersion, _verfuegbareVersion):
+                mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Es ist keine neuere " + _gdtToolGross + "-Version als die bereits installierte verfügbar.\n" + _gdtToolGross + "-Updater wird beendet.", QMessageBox.StandardButton.Ok)
+                mb.exec()
+                sys.exit()
+
+            if not self.checkProgrammverzeichnisErreichbarkeit():
+                mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Im ausgewählten Verzeichnis befindet sich keine Programmdatei von " + _gdtToolGross + ".", QMessageBox.StandardButton.Ok)
+                mb.exec()
+                self.pushButtonUpdate.setEnabled(False)
+                self.lineEditProgrammverzeichnis.setFocus()
+                self.lineEditProgrammverzeichnis.selectAll()
 
     def checkProgrammverzeichnisErreichbarkeit(self):
         """
