@@ -365,7 +365,7 @@ class MainWindow(QMainWindow):
         fd.setLabelText(QFileDialog.DialogLabel.Reject, "Abbrechen")
         if fd.exec() == 1:
             logger.logger.info("Programmverzeichnis " + fd.directory().absolutePath() + " ausgewählt")
-            self.lineEditProgrammverzeichnis.setText(fd.directory().absolutePath())
+            self.lineEditProgrammverzeichnis.setText(os.path.abspath(fd.directory().path()))
             if not self.checkProgrammverzeichnisErreichbarkeit():
                 mb = QMessageBox(QMessageBox.Icon.Question, "Hinweis von " + _gdtToolGross + "-Updater", "Im ausgewählten Verzeichnis befindet sich keine Programmdatei von " + _gdtToolGross + ".", QMessageBox.StandardButton.Ok)
                 mb.exec()
