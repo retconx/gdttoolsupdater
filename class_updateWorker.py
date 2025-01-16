@@ -1,5 +1,5 @@
 from PySide6.QtCore import QRunnable, Signal, Slot, QObject
-import os, shutil, sys, requests, zipfile2, logger, subprocess
+import os, shutil, sys, requests, zipfile2, logger, subprocess, tarfile
 
 basedir = os.path.dirname(__file__)
 
@@ -29,7 +29,7 @@ class UpdateWorker(QRunnable):
             zipname = self.gdtToolGross + ".app.zip"
             downloadverzeichnis = os.path.expanduser("~/Downloads")
         elif "linux" in platform:
-            zipname = self.gdtToolGross + ".tar.xz"
+            zipname = self.gdtToolGross + ".tar"
             downloadverzeichnis = os.path.expanduser("~/Downloads")
         # Zip-Datei herunterladen
         try:
@@ -50,9 +50,14 @@ class UpdateWorker(QRunnable):
             try:
                 # Zip-Datei in Downloads/... entpacken
                 self.signals.statusmeldung.emit(str(zipname) + " entpacken...")
-                zip_ref = zipfile2.ZipFile(os.path.join(downloadverzeichnis, zipname))
-                zip_ref.extractall(os.path.join(downloadverzeichnis, self.gdtToolGross))
-                zip_ref.close()
+                if "linux" in platform:
+                    tar_ref = tarfile.TarFile(os.path.join(downloadverzeichnis, zipname))
+                    tar_ref.extractall(os.path.join(downloadverzeichnis, zipname))
+                    tar_ref.close()
+                else:
+                    zip_ref = zipfile2.ZipFile(os.path.join(downloadverzeichnis, zipname))
+                    zip_ref.extractall(os.path.join(downloadverzeichnis, self.gdtToolGross))
+                    zip_ref.close()
                 try:
                     # Entpackten Ordner in Programmverzeichnis kopieren
                     speicherverzeichnis = self.programmverzeichnis
