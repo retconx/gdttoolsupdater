@@ -56,7 +56,7 @@ class UpdateWorker(QRunnable):
                 self.signals.statusmeldung.emit(str(zipname) + " entpacken...")
                 if "linux" in platformOs:
                     tar_ref = tarfile.TarFile(os.path.join(downloadverzeichnis, zipname))
-                    tar_ref.extractall(os.path.join(downloadverzeichnis, zipname))
+                    tar_ref.extractall(os.path.join(downloadverzeichnis, self.gdtToolGross))
                     tar_ref.close()
                 else:
                     zip_ref = zipfile2.ZipFile(os.path.join(downloadverzeichnis, zipname))
