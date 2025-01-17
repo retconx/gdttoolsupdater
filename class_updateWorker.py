@@ -31,9 +31,9 @@ class UpdateWorker(QRunnable):
             downloadverzeichnis = os.path.expanduser("~/Downloads")
         elif "linux" in platformOs:
             if platform.machine() == "arm64":
-                zipname = self.gdtToolGross + "_ARM64.tar"
+                zipname = self.gdtToolGross + "_ARM64.tar.gz"
             elif platform.machine() == "x86_64":
-                zipname = self.gdtToolGross + "_x86_64.tar"
+                zipname = self.gdtToolGross + "_x86_64.tar.gz"
             downloadverzeichnis = os.path.expanduser("~/Downloads")
         # Zip-Datei herunterladen
         try:
@@ -55,7 +55,7 @@ class UpdateWorker(QRunnable):
                 # Zip-Datei in Downloads/... entpacken
                 self.signals.statusmeldung.emit(str(zipname) + " entpacken...")
                 if "linux" in platformOs:
-                    tar_ref = tarfile.TarFile(os.path.join(downloadverzeichnis, zipname))
+                    tar_ref = tarfile.open(os.path.join(downloadverzeichnis, zipname), "r:gz")
                     tar_ref.extractall(os.path.join(downloadverzeichnis, self.gdtToolGross))
                     tar_ref.close()
                 else:
