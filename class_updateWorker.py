@@ -1,5 +1,5 @@
 from PySide6.QtCore import QRunnable, Signal, Slot, QObject
-import os, shutil, sys, requests, zipfile2, logger, subprocess, tarfile
+import os, shutil, sys, requests, zipfile2, logger, subprocess, tarfile, platform
 
 basedir = os.path.dirname(__file__)
 
@@ -21,15 +21,19 @@ class UpdateWorker(QRunnable):
 
     @Slot()
     def run(self):
-        platform = sys.platform
-        if "win32" in platform:
+        platformOs = sys.platform
+        zipname = ""
+        if "win32" in platformOs:
             zipname = self.gdtToolGross + ".zip"
             downloadverzeichnis = os.path.expanduser("~\\Downloads")
-        if "darwin" in platform:
+        if "darwin" in platformOs:
             zipname = self.gdtToolGross + ".app.zip"
             downloadverzeichnis = os.path.expanduser("~/Downloads")
-        elif "linux" in platform:
-            zipname = self.gdtToolGross + ".tar"
+        elif "linux" in platformOs:
+            if platform.machine() == "arm64":
+                zipname = self.gdtToolGross + "_ARM64.tar"
+            elif platform.machine() == "x86_64":
+                zipname = self.gdtToolGross + "_x86_64.tar"
             downloadverzeichnis = os.path.expanduser("~/Downloads")
         # Zip-Datei herunterladen
         try:
@@ -50,7 +54,7 @@ class UpdateWorker(QRunnable):
             try:
                 # Zip-Datei in Downloads/... entpacken
                 self.signals.statusmeldung.emit(str(zipname) + " entpacken...")
-                if "linux" in platform:
+                if "linux" in platformOs:
                     tar_ref = tarfile.TarFile(os.path.join(downloadverzeichnis, zipname))
                     tar_ref.extractall(os.path.join(downloadverzeichnis, zipname))
                     tar_ref.close()
@@ -61,9 +65,9 @@ class UpdateWorker(QRunnable):
                 try:
                     # Entpackten Ordner in Programmverzeichnis kopieren
                     speicherverzeichnis = self.programmverzeichnis
-                    if "win32" in platform:
+                    if "win32" in platformOs:
                         speicherverzeichnis = self.programmverzeichnis.replace("/", "\\")
-                    elif "darwin" in platform or "linux" in platform:
+                    elif "darwin" in platformOs or "linux" in platformOs:
                         subprocess.run([os.path.join(basedir, "changeMode.sh"), os.path.join(downloadverzeichnis, self.gdtToolGross)])
                     self.signals.statusmeldung.emit("Programmdateien nach "  + speicherverzeichnis + " kopieren...")
                     shutil.copytree(os.path.join(downloadverzeichnis, self.gdtToolGross), speicherverzeichnis, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__MACOSX"))
