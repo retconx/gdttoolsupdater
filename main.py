@@ -40,7 +40,8 @@ gdtTools = {
     "inrgdt": "InrGDT",
     "optigdt": "OptiGDT",
     "scoregdt": "ScoreGDT",
-    "signogdt": "SignoGDT"
+    "signogdt": "SignoGDT",
+    "insugdt" : "InsuGDT"
     }
 
 startOhneArgumente = False
